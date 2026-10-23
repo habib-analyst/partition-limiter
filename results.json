@@ -1,0 +1,166 @@
+{
+  "started_at": "2026-10-23T14:03:49Z",
+  "redis_version": "Redis server v=7.4.2 sha=00000000:1 malloc=jemalloc-5.3.0 bits=64 build=ee01ef89c4d6eeb8",
+  "config": {
+    "attempt_rate_per_node_rps": 120,
+    "burst": 50,
+    "nodes": 3,
+    "period_s": 10,
+    "rate_per_period": 500,
+    "topology": "primary :7301, replicas :7302/:7303 (replicaof 7301); all limiter nodes share the primary in healthy mode"
+  },
+  "phases": [
+    {
+      "name": "healthy",
+      "how_induced": "no fault; all nodes on the primary",
+      "duration_s": 10,
+      "attempts": 3304,
+      "admitted": 549,
+      "admitted_global": 549,
+      "admitted_local": 0,
+      "admitted_failopen": 0,
+      "rejected": 2755,
+      "admitted_per_node": [
+        199,
+        182,
+        168
+      ],
+      "expected_quota": 550,
+      "bound": 553,
+      "over_admission_pct_vs_quota": -0.18,
+      "within_bound": true
+    },
+    {
+      "name": "partial_partition_k1",
+      "how_induced": "client-subset isolation: node 3 pointed at dead address 127.0.0.1:7399; nodes 1-2 keep the live primary",
+      "duration_s": 10,
+      "attempts": 3168,
+      "admitted": 732,
+      "admitted_global": 549,
+      "admitted_local": 183,
+      "admitted_failopen": 0,
+      "rejected": 2436,
+      "admitted_per_node": [
+        270,
+        279,
+        183
+      ],
+      "expected_quota": 550,
+      "bound": 734,
+      "over_admission_pct_vs_quota": 33.09,
+      "within_bound": true
+    },
+    {
+      "name": "full_partition_bounded",
+      "how_induced": "kill -9 on the primary (7301); replicas hold no write path",
+      "duration_s": 10,
+      "attempts": 2932,
+      "admitted": 549,
+      "admitted_global": 0,
+      "admitted_local": 549,
+      "admitted_failopen": 0,
+      "rejected": 2383,
+      "admitted_per_node": [
+        183,
+        183,
+        183
+      ],
+      "expected_quota": 550,
+      "bound": 554,
+      "over_admission_pct_vs_quota": -0.18,
+      "within_bound": true
+    },
+    {
+      "name": "full_partition_skewed",
+      "how_induced": "primary still down; 90% of attempts land on node 1, whose local cap binds",
+      "duration_s": 6,
+      "attempts": 1544,
+      "admitted": 322,
+      "admitted_global": 0,
+      "admitted_local": 322,
+      "admitted_failopen": 0,
+      "rejected": 1222,
+      "admitted_per_node": [
+        116,
+        103,
+        103
+      ],
+      "expected_quota": 350,
+      "bound": 354,
+      "over_admission_pct_vs_quota": -8,
+      "within_bound": true
+    },
+    {
+      "name": "healed",
+      "how_induced": "primary restarted from the same data dir (AOF state survives)",
+      "duration_s": 10,
+      "attempts": 3119,
+      "admitted": 549,
+      "admitted_global": 549,
+      "admitted_local": 0,
+      "admitted_failopen": 0,
+      "rejected": 2570,
+      "admitted_per_node": [
+        188,
+        199,
+        162
+      ],
+      "expected_quota": 550,
+      "bound": 553,
+      "over_admission_pct_vs_quota": -0.18,
+      "within_bound": true
+    },
+    {
+      "name": "full_partition_failopen",
+      "how_induced": "primary killed; fallback policy = fail-open (Envoy failure_mode_deny=false equivalent)",
+      "duration_s": 6,
+      "attempts": 1935,
+      "admitted": 1935,
+      "admitted_global": 0,
+      "admitted_local": 0,
+      "admitted_failopen": 1935,
+      "rejected": 0,
+      "admitted_per_node": [
+        646,
+        645,
+        644
+      ],
+      "expected_quota": 350,
+      "bound": -1,
+      "over_admission_pct_vs_quota": 452.86,
+      "within_bound": false
+    },
+    {
+      "name": "full_partition_failclosed",
+      "how_induced": "primary still down; fallback policy = fail-closed (Envoy failure_mode_deny=true equivalent)",
+      "duration_s": 4,
+      "attempts": 1053,
+      "admitted": 0,
+      "admitted_global": 0,
+      "admitted_local": 0,
+      "admitted_failopen": 0,
+      "rejected": 1053,
+      "admitted_per_node": [
+        0,
+        0,
+        0
+      ],
+      "expected_quota": 250,
+      "bound": 250,
+      "over_admission_pct_vs_quota": -100,
+      "within_bound": true
+    }
+  ],
+  "heal": {
+    "store_ready_ms": 185.31,
+    "time_to_exactness_ms": 2.51,
+    "stats_reported_local_admissions": 871,
+    "harness_counted_local_admissions": 871,
+    "reconciliation_match": true
+  },
+  "notes": [
+    "The three limiter nodes are objects in this one harness process (one host clock); multi-host clock skew is out of scope — the bound covers skew analytically at W + 2*delta.",
+    "Each phase uses a fresh bucket key, so phases measure rested-bucket behaviour and do not contaminate each other.",
+    "In-flight decisions at the instant of kill -9 can be lost either way by TCP semantics; the harness counts a decision only when the limiter returns one (local fallback included), so the kill instant contributes at most a few hundred ms of local-mode decisions, which are inside the bound by construction."
+  ]
+}
